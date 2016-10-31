@@ -28,3 +28,17 @@ def is_free(board, position):
         if i[0] == position[0] or i[1] == position[1] or abs(i[0] - position[0]) == abs(i[1] - position[1]):
             return False
     return True
+
+
+'''
+# really cool solution using itertools (not mine, found online after my code was completed)
+
+from itertools import permutations
+ 
+n = 8
+cols = range(n)
+for vec in permutations(cols):
+    if n == len(set(vec[i]+i for i in cols)) \
+         == len(set(vec[i]-i for i in cols)):
+        print ( vec )
+'''
