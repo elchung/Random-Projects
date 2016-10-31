@@ -1,0 +1,56 @@
+'''
+Given a document and searchterms, return the smallest substring that contains the search terms
+-return first substring if multiple same length
+-doc guaranteed to contain all search terms
+-all lower case separated by single space
+-words in doc 0<x<100, len(word) < 10
+'''
+
+
+
+def answer(document, searchTerms):
+    word_list = document.split()
+    search_word_order = []
+    search_string_to_next = []
+    current_word_string = ''
+
+    used_words = []
+    shortest_string = ''
+    search_term_as_list = []
+
+    for word in word_list:
+        if searchTerms.contains(word):
+            if current_word_string is not '': #initial check
+                search_string_to_next.append(current_word_string)
+            current_word_string = word + ' '
+            search_word_order.append(word)
+        elif current_word_string != '': #takes care of beginning
+            current_word_string += word + ' '
+    search_string_to_next.append(current_word_string)
+
+    # at this point search_string_to_next is full of parts of
+    # the entire string, minus teh beginning if the string didn't
+    # start with a search term.
+
+    #store the unique starting worded string list in a new list
+    for index, string in enumerate(search_string_to_next):
+        current_word_string = ''
+        #if string has the last word we need
+        if search_word_order[index] in string and search_word_order[index] not in used_words and len(used_words) == len(searchTerms) - 1:
+            search_term_as_list.append(search_word_order[index]) #add string to list
+            used_words.append(search_word_order[index])
+            if shortest_string != '': #if complete, check length, need to cut off last  str to one word
+                for stringthing in search_term_as_list[:-1]:
+                    current_word_string += stringthing
+                current_word_string += search_term_as_list
+                if len(''.join(str(e) for e in search_term_as_list)) < shortest_string:
+                    shortest_string = ''.join(str(e) for e in search_term_as_list)
+        elif used_words.contains(search_word_order[index]):   #if word appears earlier in used words list
+            search_term_as_list = search_term_as_list[used_words.index(string):]
+            used_words = search_term_as_list[used_words.index(string):]
+
+            search_term_as_list.append(search_word_order[index])  # add string to list
+            used_words.append(search_word_order[index])
+        else: #if word doesn't exist yet
+            search_term_as_list.append(search_word_order[index])  # add string to list
+            used_words.append(search_word_order[index])
