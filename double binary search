@@ -1,0 +1,28 @@
+'''Given two sorted arrays of varying lengths, return the kth smallest value'''
+
+def double_binary_search(a, b, k):
+    #assume sorted arrays
+    if k == 1:
+        return min(a[0], b[0])
+    if k > (len(a) + len(b)):
+        return None
+    if len(a) > len(b):
+        return double_binary_search(b, a, k)
+    if k < len(a):
+        return double_binary_search(a[:k], b, k)
+    if k < len(b):
+        return double_binary_search(a, b[:k], k)
+
+    #at this point, we know that k >= len(a) and len(b), and len(a) <= len(b)
+
+    #if the sum of a[1/2] and b[1/2]
+    if len(a) > 1 and len(b) > 1:
+        if a[len(a) // 2] < b[len(b) // 2]: #a at 1/2 point is smaller
+            return double_binary_search(a[:len(a) // 2], b, k - len(a) // 2)
+        else:
+            return double_binary_search(a, b[len(b) // 2:], k)
+    else: #we know that len(a) <= len(b), len(a) = 1
+        if a[0] < b[k - 1]:
+            return b[k - 1]
+        else:
+            return b[k]
