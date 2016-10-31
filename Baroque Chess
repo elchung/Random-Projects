@@ -1,0 +1,477 @@
+'''Baroque Chess move methods. Gameplay wrapper was provided for class.
+The methods below compute the best moves based on the current board state using an iterative DFS'''
+
+import time as time
+
+def introduce():
+    return '''Hello, my name is Eric Chung'''
+
+def nickname():
+    return "Oofus Doofus"
+
+
+def makeMove(currentState, currentRemark, timeLimit=10000):
+    # Constructs
+
+    depth = 1
+    timeout = time.time() + (timeLimit / 1000)
+    best_state = []
+    while time.time() - timeout > (timeLimit * 0.01):
+        best_state = find_best_move(currentState, depth)  # returns the best state
+        depth += 1
+    return best_state[0][0]
+
+
+def find_best_move(cs, d):  # returns a list
+    initial_moves = find_all_moves(cs)  # list of [bs, heuristic value]
+
+    white_turn = True  # true if white's turn
+    if cs.whose_turn % 2 == 0:  # used for maxmin selection
+        white_turn = False  # false if back
+
+    if white_turn:
+        initial_moves = sorted(initial_moves, key=lambda x: x[1],
+                               reverse=True)  # sort backwards so the return function get's it correct
+    else:
+        initial_moves = sorted(initial_moves, key=lambda x: x[1])
+
+    # at this point, best move for current player is on left
+    if d > 0:
+        for board_state in initial_moves:
+            list_thing = find_best_move(board_state[0][0], d - 1)
+            board_state[1] = list_thing[0][0]  # might be backwards
+
+    if white_turn:
+        return sorted(initial_moves, key=lambda x: x[1],
+                      reverse=True)  # sort backwards so the return function get's it correct
+    else:
+        return sorted(initial_moves, key=lambda x: x[1])
+
+
+def who(piece):
+    return piece % 2
+
+def parse(bs):  # bs is board string
+    '''Translate a board string into the list of lists representation.'''
+    b = [[0, 0, 0, 0, 0, 0, 0, 0] for r in range(8)]
+    rs9 = bs.split("\n")
+    rs8 = rs9[1:]  # eliminate the empty first item.
+    for iy in range(8):
+        rss = rs8[iy].split(' ')
+        for jx in range(8):
+            b[iy][jx] = INIT_TO_CODE[rss[jx]]
+    return b
+
+
+INITIAL = parse('''
+c l i w k i l f
+p p p p p p p p
+- - - - - - - -
+- - - - - - - -
+- - - - - - - -
+- - - - - - - -
+P P P P P P P P
+F L I W K I L C
+''')
+
+BLACK = 0
+WHITE = 1
+
+
+def test_starting_board():
+    init_state = BC_state(INITIAL, WHITE)
+    print(init_state)
+
+
+test_starting_board()
+
+
+class BC_state:
+    def __init__(self, old_board=INITIAL, whose_move=WHITE):
+        new_board = [r[:] for r in old_board]
+        self.board = new_board
+        self.whose_move = whose_move
+
+    def __repr__(self):
+        s = ''
+        for r in range(8):
+            for c in range(8):
+                s += CODE_TO_INIT[self.board[r][c]] + " "
+                s += "\n"
+        if self.whose_move == WHITE:
+            s += "WHITE's move"
+        else:
+            s += "BLACK's move"
+        s += "\n"
+        return s
+
+
+INIT_TO_CODE = {'p': 2, 'P': 3, 'c': 4, 'C': 5, 'l': 6, 'L': 7, 'i': 8, 'I': 9,
+                'w': 10, 'W': 11, 'k': 12, 'K': 13, 'f': 14, 'F': 15, '-': 0}
+
+CODE_TO_INIT = {0: '-', 2: 'p', 3: 'P', 4: 'c', 5: 'C', 6: 'l', 7: 'L', 8: 'i', 9: 'I',
+                10: 'w', 11: 'W', 12: 'k', 13: 'K', 14: 'f', 15: 'F'}
+
+
+def find_all_moves(b):
+    turn = b.whose_turn
+    bs = b.borad
+    moves = []
+
+    for i in range(8):
+        for j in range(8):
+            piece = bs[i][j]
+            if (piece == 12 or piece == 13) and piece % 2 == turn:
+                moves.extend(move_king(b, i, j))
+            elif (piece == 2 or piece == 3) and piece % 2 == turn:
+                moves.extend(move_pincer(b, piece, i, j))
+            elif piece != 0 and piece % 2 == turn:
+                moves.extend(move_queen(b, i, j))
+
+
+def move_gen(i, j):
+    # directions are stored in tuple as (steps to border in that direction, i direction, j direction)
+    w = (i, -1, 0, 'W')
+    e = (7 - i, 1, 0, 'E')
+    n = (j, 0, -1, 'N')
+    s = (7 - j, 0, 1, 'S')
+    nw = (min(i, j), -1, -1, 'NW')
+    ne = (min(7 - i, j), 1, -1, 'NE')
+    sw = (min(i, 7 - j), -1, 1, 'SW')
+    se = (min(7 - i, 7 - j), 1, 1, 'SE')
+    return [n, s, w, e, nw, ne, sw, se]
+
+
+def frozen(bs, i, j):  # (i, j) --> piece position
+    b = bs.board
+    type = b[i][j]
+    freezer = 14
+    if type % 2 == 0:
+        freezer = 15
+    for dir in move_gen(i, j):
+        if b[dir[0]][dir[1]] == freezer:
+            if immitator_freeze(bs, dir[0], dir[1], b[dir[0]][dir[1]]):
+                return False  # Returns False if freezer is adjacent but immitator is adjacent to freezer
+            return True  # Returns true if freezer is adjacent
+
+    return False
+
+
+def immitator_freeze(bs, i, j, type):  # (i, j) --> takes in freezer position
+    b = bs.board
+    immitator = 8
+    if type % 2 == 1:
+        immitator = 9
+    for dir in move_gen(i, j):
+        if b[dir[0]][dir[1]] == immitator:
+            return True
+    return False
+
+
+def move_king(bs, i, j, immit=False):  # piece?
+    new_state = BC_state(bs, bs.whose_move)
+    potential_moves = []  # list of potential new board states that king can move
+    type = bs[i][j]
+
+    potential_moves.append(king_capture(new_state, i, j, i + 1, j - 1, type, immit))  # go up left
+    potential_moves.append(king_capture(new_state, i, j, i + 1, j, type, immit))  # go up
+    potential_moves.append(king_capture(new_state, i, j, i + 1, j + 1, type, immit))  # go up right
+    potential_moves.append(king_capture(new_state, i, j, i, j - 1, type, immit))  # go left
+    potential_moves.append(king_capture(new_state, i, j, i, j + 1, type, immit))  # go right
+    potential_moves.append(king_capture(new_state, i, j, i - 1, j - 1, type, immit))  # go down left
+    potential_moves.append(king_capture(new_state, i, j, i - 1, j, type, immit))  # go down
+    potential_moves.append(king_capture(new_state, i, j, i - 1, j + 1, type, immit))  # go down right
+    return potential_moves
+
+
+def move_immitator(b, piece, i, j):  ####################################################################################################
+    moves = []
+    pass
+
+
+def king_capture(bs, o_i, o_j, n_j, n_i, type, immit):
+    heuristic = 0
+    b = bs.board
+    piece = b[n_i][n_j]
+    b[n_i][n_j] = type
+    b[o_i][o_j] = 0
+    if immit:
+        if CODE_TO_INIT[b[n_i][n_j]].tolower() == 'k':
+            return (bs, heuristic)
+        else:
+            return (None, None)
+    return [bs, staticEval(bs)]
+
+
+def move_pincer(b, piece, i, j):
+    bs = b.board
+    type = bs[i][j]
+    moves = []
+
+    for ii in range(i, 8):
+        if bs[ii][j] != 0:
+            break
+        if ii != i and bs[ii][j] == 0:
+            abc = pincer_capture(b, type, i, j, ii, j)  # b = board state
+            moves.append([abc, staticEval(abc)])
+
+    for ii in range(i, -1, -1):
+        if bs[ii][j] != 0:
+            break
+        if ii != i and bs[ii][j] == 0:
+            abc = pincer_capture(b, type, i, j, ii, j)
+            moves.append([abc, staticEval(abc)])
+
+    for jj in range(j, 8):
+        if bs[i][jj] != 0:
+            break
+        if ii != i:
+            abc = pincer_capture(b, type, i, j, ii, j)
+            moves.append([abc, staticEval(abc)])
+
+    for jj in range(j, -1, -1):
+        if bs[jj][j] != 0:
+            break
+        if jj != j:
+            abc = pincer_capture(b, type, i, j, i, jj)
+            moves.append([abc, staticEval(abc)])
+
+    return moves
+    # moves like rooks, captures if surrounding another piece with a friendly piece. e.g. 'F-Pincer' - 'E-king'
+    # moves like a rook ,not queen
+
+
+def pincer_capture(bs, type, o_i, o_j, new_i, new_j):
+    bb = BC_state(bs, bs.whose_move - 1)
+    b = bb.board
+    b[new_i][new_j] = type
+    if b[new_i + 1][new_j] != 0 and (is_white(b[new_i + 1][new_j])) ^ is_white(type):
+        if new_i + 2 < 8:
+            chk_piece = b[new_i + 2][new_j]
+            if (chk_piece == type):
+                b[new_i + 1][new_j] = 0
+
+    if b[new_i - 1][new_j] != 0 and (is_white(b[new_i - 1][new_j])) ^ is_white(type):
+        if new_i - 2 > -1:
+            chk_piece = b[new_i - 2][new_j]
+            if (chk_piece == type):
+                b[new_i - 1][new_j] = 0
+
+    if b[new_i][new_j + 1] != 0 and (is_white(b[new_i][new_j + 1])) ^ is_white(type):
+        if new_j + 2 < 8:
+            chk_piece = b[new_i][new_j + 2]
+            if (chk_piece == type):
+                b[new_i][new_j + 1] = 0
+
+    if b[new_i][new_j - 1] != 0 and (is_white(b[new_i][new_j - 1])) ^ is_white(type):
+        if new_j - 2 > -1:
+            chk_piece = b[new_i][new_j - 2]
+            if (chk_piece == type):
+                b[new_i][new_j - 1] = 0
+    return bb
+
+
+def move_queen(b, i, j, immit=False):  # type = name of piece (withdrawer, leaper, coordinator, immobilizer, imitator)
+    bs = b.board
+    # depending on type, check captures and return possible rook move
+    moves = []  # list of potential board states
+    if not frozen(b, i, j):
+
+        type = bs[i][j]  # type = name of piece (withdrawer, leaper, coordinator, immobilizer, imitator)
+        move_itr = []  # Stores: (max_steps, i_move, j_move)
+
+        # directions are stored in tuple as (steps to border in that direction, i direction, j direction)
+        w = (i, -1, 0, 'W')
+        e = (7 - i, 1, 0, 'E')
+        n = (j, 0, -1, 'N')
+        s = (7 - j, 0, 1, 'S')
+        nw = (min(i, j), -1, -1, 'NW')
+        ne = (min(7 - i, j), 1, -1, 'NE')
+        sw = (min(i, 7 - j), -1, 1, 'SW')
+        se = (min(7 - i, 7 - j), 1, 1, 'SE')
+        move_itr += [n, s, w, e, nw, ne, sw, se]
+
+        for dir in move_itr:  # iteration 1: dir = (steps, 0, -1)
+            leaped = False
+            double_leaped = False
+            step_i = i
+            step_j = j
+            piece_leaped = (-1, -1)
+            for steps in dir[0]:
+                if (leaped and CODE_TO_INIT[bs[i][j]].lower() != 'l') or double_leaped:
+                    break
+
+                step_i += move_itr[1]  # adds delta to current i position
+                step_j += move_itr[2]  # adds delta to current j position
+                if bs[step_i][step_j] != 0:  # if collision
+                    if leaped:
+                        double_leaped = True
+                    else:
+                        leaped = True
+                        piece_leaped = (step_i, step_j)
+                else:  # if going to empty space
+                    ns = BC_state(b, bs.whose_move - 1)  # creates a new board state with opposite player's turn
+                    new_state = ns.board
+                    c_moves = {'W': (-1, 0), 'E': (1, 0), 'N': (0, -1), 'S': (0, 1), 'NW': (-1, -1), 'NE': (1, -1),
+                               'SW': (-1, 1), 'SE': (1, 1)}
+
+                    new_state[step_i][step_j] = type
+
+                    move_state = update_state(ns, step_i, step_j, dir[3], piece_leaped, immit, type, i, j)
+                    ## INSERT CAPTURE FUNCTION MECHANISM HERE
+                    if immit and new_state != move_state:  # if imitator and a piece got captured
+                        moves.append([move_state, staticEval(move_state)])
+                    elif ns != move_state and move_state is not None:
+                        if (immit):
+                            if new_state[piece_leaped[0]][piece_leaped[1]] % 2 != type % 2:
+                                moves.append([move_state, staticEval(move_state)])
+                        else:
+                            moves.append([new_state, staticEval(ns)])
+    return moves
+
+
+def update_state(bs, n_i, n_j, direction, piece_leaped, immit, type, o_i=None, o_j=None, ):
+    ns = BC_state(bs, bs.whose_move - 1)
+    b = ns.board
+    # CAN'T GO BEYOND ANOTHER PIECE (minus leaper)
+    # returns nothing, modifies bs to represent any potential captures
+    piece = CODE_TO_INIT[type].tolower()  # string reperesentation of type, which is input as an int
+
+    if piece == 'w' or piece == 'i':  # withdrawer
+        W_positions = {'N': b[o_i][o_j + 1], 'E': b[o_i - 1][o_j], 'S': b[o_i][o_j - 1], 'W': b[o_i + 1][o_j],
+                       'NE': b[o_i - 1][o_j + 1], 'NW': b[o_i + 1][o_j + 1], 'SE': b[o_i - 1][o_j - 1],
+                       'SW': b[o_i + 1][o_j - 1]}
+        if W_positions[direction] != 0 and (is_white(W_positions[direction]) ^ is_white(type)):
+            if (immit and CODE_TO_INIT[W_positions[direction]].lower() == 'w') or not immit:
+                W_positions[direction] = 0
+
+    if piece == 'c' or piece == 'i':  # coordinator c+ and k+ intersect
+        (king_i, king_j) = find_king(bs, type)
+
+        if b[n_i][king_j] != 0 and (is_white(b[n_i][king_j]) ^ is_white(type)):
+            if (immit and CODE_TO_INIT[b[n_i][king_j]].lower() == 'c') or not immit:
+                b[n_i][king_j] = 0
+        elif b[king_i][n_j] != 0 and (is_white(b[king_i][n_j]) ^ is_white(type)):
+            if (immit and CODE_TO_INIT[b[king_i][n_j]].lower() == 'c') or not immit:
+                b[king_i][n_j] = 0
+    if piece == 'i' and (n_i == o_i or n_j == o_j):  # if moves like rook for pincer check
+        if b[n_i + 1][n_j] != 0 and (is_white(b[n_i + 1][n_j])) ^ is_white(type):
+            if n_i + 2 < 8:
+                chk_piece = b[n_i + 2][n_j]
+                if chk_piece == type:
+                    b[n_i + 1][n_j] = 0
+
+        if b[n_i - 1][n_j] != 0 and (is_white(b[n_i - 1][n_j])) ^ is_white(type):
+            if n_i - 2 > -1:
+                chk_piece = b[n_i - 2][n_j]
+                if chk_piece == type:
+                    b[n_i - 1][n_j] = 0
+
+        if b[n_i][n_j + 1] != 0 and (is_white(b[n_i][n_j + 1])) ^ is_white(type):
+            if n_j + 2 < 8:
+                chk_piece = b[n_i][n_j + 2]
+                if (chk_piece == type):
+                    b[n_i][n_j + 1] = 0
+
+        if b[n_i][n_j - 1] != 0 and (is_white(b[n_i][n_j - 1])) ^ is_white(type):
+            if n_j - 2 > -1:
+                chk_piece = b[n_i][n_j - 2]
+                if chk_piece == type:
+                    b[n_i][n_j - 1] = 0
+
+    if piece == 'l' or piece == 'i':  # piece is 'l'
+        if piece_leaped != (None, None) and (is_white(b[piece_leaped[0]][piece_leaped[1]]) ^ is_white(type)):
+            if (immit and CODE_TO_INIT[b[piece_leaped[0]][
+                piece_leaped[1]]].lower() == 'l') or not immit:  # if immmitator and leaped leaper, or not immitator
+                b[piece_leaped[0]][piece_leaped[1]] = 0
+        elif piece_leaped != (None, None) and (is_white(b[piece_leaped[0]][piece_leaped[1]]) and is_white(
+                type)):  # if leaped friendly piece, which shouldn't happen
+            return None
+            # do leaper things
+        b[n_i][n_j] = type
+    b[o_i][o_j] = 0
+    return ns
+
+
+def find_king(bs, type):
+    state = BC_state(bs, bs.whose_move - 1)
+    b = state.board
+
+    if not is_white(type):
+        for r in range(8):
+            for c in range(8):
+                if b[c][r] == 12:  # code for black king
+                    return (c, r)
+    else:
+        for r in range(8):
+            for c in range(8):
+                if b[c][r] == 13:
+                    return (c, r)
+    return (-1, -1)  # if somehow can't find king
+
+
+def is_white(piece):
+    if piece % 2 == 0:
+        return False
+    else:
+        return True
+
+
+def staticEval(state):
+    b = state.board
+    sum_black = 0
+    sum_white = 0
+    piece_calculation = {0: 0, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3, 7: 3, 8: 6, 9: 6, 10: 5, 11: 5, 14: 6, 15: 6}
+    bk = None  # black king location
+    wk = None  # white king location
+    king_array = [[10, 7, 7, 7, 7, 7, 7, 10],
+                  [7, 5, 5, 4, 4, 5, 5, 7],
+                  [7, 5, 4, 1, 1, 4, 5, 7],
+                  [7, 4, 1, 0, 0, 1, 4, 6],
+                  [7, 4, 1, 0, 0, 1, 4, 6],
+                  [7, 5, 4, 1, 1, 4, 5, 7],
+                  [7, 5, 5, 4, 4, 5, 5, 7],
+                  [10, 7, 7, 7, 7, 7, 7, 10]]
+
+    for i in range(8):
+        for j in range(8):
+            if b[i][j] != 0 and b[i][j] != 12 and b[i][j] != 13:
+                if b[i][j] % 2 == 0:
+                    sum_black += piece_calculation[b[i][j]]
+                else:
+                    sum_white += piece_calculation[b[i][j]]
+            elif b[i][j] == 12:  # if black king
+                bk = (i, j)
+            elif b[i][j] == 13:  # if white king
+                wk = (i, j)
+    if bk == None:
+        sum_white += 100000000
+        sum_black -= 100000000  # white should capture king at all costs, black keep king alive at all costs
+    else:
+        sum_white += king_array[wk[0]][wk[1]]
+    if wk == None:
+        sum_black += 100000000
+        sum_white -= 100000000  # black should capture white king at all costs, keep its own king alive at all costs
+    else:
+        sum_black += king_array[wk[0]][wk[1]]
+
+    return sum_white - sum_black
+
+
+
+
+    # {0:'-',2:'p',3:'P',4:'c',5:'C',6:'l',7:'L',8:'i',9:'I' 10:'w',11:'W',12:'k',13:'K',14:'f',15:'F'}
+
+
+'''
+BLACK = 0
+WHITE = 1
+NORTH = 0
+SOUTH = 1
+WEST = 2
+EAST = 3
+NW = 4
+NE = 5
+SW = 6
+SE = 7
+'''
