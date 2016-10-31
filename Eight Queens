@@ -1,0 +1,30 @@
+#returns a list of all possible board states of eight queens on a board size n-by-n
+def eight_queens(n):
+    board_states = eight_helper_recursive(n, [], 1, [])
+    return board_states
+
+
+# recursive function that takes in the current board state and level and eventually returns a completed board
+# level is the current level that needs to be checked
+def eight_helper_recursive(n, board, level, board_states):
+        # need to check if last level or not
+    if level > n:
+        if len(board) == n:
+            print("adding board: " + str(board))
+            board_states.append(board)
+        return board_states
+    for i in range(1, n + 1):
+        current_position = (i, level)
+        if is_free(board, current_position):
+            board.append(current_position)
+            board_states = eight_helper_recursive(n, board[:], level + 1, board_states)
+            board.pop()
+    return board_states
+
+# returns true if position is available
+def is_free(board, position):
+    for i in board:
+        #if diagonal or horizontal or veritally crossing
+        if i[0] == position[0] or i[1] == position[1] or abs(i[0] - position[0]) == abs(i[1] - position[1]):
+            return False
+    return True
